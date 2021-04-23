@@ -17,8 +17,7 @@ use structopt::StructOpt;
 use cookie::Cookie;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use warp::{self, Filter, filters};
-use tokio::net::UnixListener;
-use tokio_stream::wrappers::UnixListenerStream;
+use tokio::{signal, select};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -136,6 +135,9 @@ async fn main() {
             process::exit(-1);
         }
         else {
+            use tokio::net::UnixListener;
+            use tokio_stream::wrappers::UnixListenerStream;
+
             let socket_path = cfg.listen.strip_prefix("unix:").unwrap();
 
             // Try removing an old existing socket file
@@ -155,15 +157,26 @@ async fn main() {
 
             let incoming = UnixListenerStream::new(listener);
 
-            warp::serve(services)
-                .run_incoming(incoming)
-                .await;
+            let server = warp::serve(services)
+                .run_incoming(incoming);
+
+            select! {
+                _ = server => (),
+                _ = signal::ctrl_c() => (),
+            }
+
+            // Cleanup socket file
+            let _ = fs::remove_file(socket_path);
         }
     }
     else {
-        warp::serve(services)
-        .run(cfg.listen.parse::<std::net::SocketAddr>().unwrap())
-        .await;
+        let server = warp::serve(services)
+            .run(cfg.listen.parse::<std::net::SocketAddr>().unwrap());
+
+        select! {
+            _ = server => (),
+            _ = signal::ctrl_c() => (),
+        }
     }
 }
 
