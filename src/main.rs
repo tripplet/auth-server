@@ -2,15 +2,18 @@ use std::error::Error;
 use std::fs;
 use std::process;
 
+// Serialization
 use serde::{Deserialize, Serialize};
 
 // Logging
 use log::{error, LevelFilter};
 use simple_logger::SimpleLogger;
 
-extern crate time;
+// Time management
 use time::Duration;
+extern crate time;
 
+// Commandline parsing
 use structopt::StructOpt;
 
 // Web related stuff
@@ -135,33 +138,11 @@ async fn main() {
             process::exit(-1);
         }
         else {
-            use tokio::net::UnixListener;
-            use tokio_stream::wrappers::UnixListenerStream;
-
             let socket_path = cfg.listen.strip_prefix("unix:").unwrap();
-
-            // Try removing an old existing socket file
-            let _ = fs::remove_file(socket_path);
-
-            // Set umask to o=rw,g=rw,o= before creating the socket file
-            let old_umask = nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
-            let listener = UnixListener::bind(socket_path).unwrap();
-
-            // Restore the socket file
-            nix::sys::stat::umask(old_umask);
-
-            // Set socket group owner and permissions
-            if let Some(socket_group) = cfg.socket_group {
-                set_socket_permissions(&socket_path, &socket_group).unwrap();
-            }
-
-            let incoming = UnixListenerStream::new(listener);
-
-            let server = warp::serve(services)
-                .run_incoming(incoming);
+            let incoming = create_socket_file(socket_path, cfg.socket_group).unwrap();
 
             select! {
-                _ = server => (),
+                _ = warp::serve(services).run_incoming(incoming) => (),
                 _ = signal::ctrl_c() => (),
             }
 
@@ -181,12 +162,28 @@ async fn main() {
 }
 
 #[cfg(any(unix, doc))]
-fn set_socket_permissions(socket_path: &str, group: &str) -> Result<(), Box<dyn Error>> {
+fn create_socket_file(socket_path: &str, group: Option<String>) -> Result<tokio_stream::wrappers::UnixListenerStream, Box<dyn Error>> {
     use nix::unistd::{Group};
+    use tokio::net::UnixListener;
+    use tokio_stream::wrappers::UnixListenerStream;
 
-    let group = Group::from_name(&group)?.ok_or("group not found")?;
-    let _ = nix::unistd::chown(socket_path, None, Some(group.gid))?;
-    Ok(())
+    // Try removing an old existing socket file
+    let _ = fs::remove_file(socket_path);
+
+    // Set umask to o=rw,g=rw,o= before creating the socket file
+    let old_umask = nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
+    let listener = UnixListener::bind(socket_path).unwrap();
+
+    // Restore the socket file
+    nix::sys::stat::umask(old_umask);
+
+    // Set socket group owner and permissions
+    if let Some(socket_group) = group {
+        let group = Group::from_name(&socket_group)?.ok_or("group not found")?;
+        let _ = nix::unistd::chown(socket_path, None, Some(group.gid))?;
+    }
+
+    Ok(UnixListenerStream::new(listener))
 }
 
 fn generate_cookie(name: &str, sub: &str, duration: Duration, domain: &str, key: &str) -> Result<String, Box<dyn Error>> {
