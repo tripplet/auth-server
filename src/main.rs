@@ -174,7 +174,7 @@ fn create_socket_file(socket_path: &str, group: Option<String>) -> Result<tokio_
     let old_umask = nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
     let listener = UnixListener::bind(socket_path).unwrap();
 
-    // Restore the socket file
+    // Restore the umask
     nix::sys::stat::umask(old_umask);
 
     // Set socket group owner and permissions
