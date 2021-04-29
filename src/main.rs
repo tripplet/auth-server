@@ -19,8 +19,8 @@ use structopt::StructOpt;
 // Web related stuff
 use cookie::Cookie;
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
-use warp::{self, Filter, filters};
-use tokio::{signal, select};
+use tokio::{select, signal};
+use warp::{self, filters, Filter};
 
 #[derive(Debug, Serialize, Deserialize)]
 struct Claims {
@@ -82,11 +82,9 @@ async fn main() {
     if cfg.secret.is_some() && cfg.secret_file.is_some() {
         error!("Do not specify both secret and secret_file");
         process::exit(-1);
-    }
-    else if let Some(secret) = cfg.secret {
+    } else if let Some(secret) = cfg.secret {
         secret_key = Box::leak(secret.into_boxed_str());
-    }
-    else if let Some(secret_file) = cfg.secret_file {
+    } else if let Some(secret_file) = cfg.secret_file {
         secret_key = Box::leak(
             fs::read_to_string(secret_file)
                 .expect("file 'secret' not found, exiting")
@@ -94,8 +92,7 @@ async fn main() {
                 .to_string()
                 .into_boxed_str(),
         );
-    }
-    else {
+    } else {
         error!("No secret defined");
         process::exit(-1);
     }
@@ -121,11 +118,19 @@ async fn main() {
                 duration,
                 &param.domain,
                 &secret_key,
-            ).unwrap();
+            )
+            .unwrap();
 
-            let valid_util = (time::OffsetDateTime::now_utc() + duration).format("%Y-%m-%d %H:%M:%S UTC");
+            let valid_util =
+                (time::OffsetDateTime::now_utc() + duration).format("%Y-%m-%d %H:%M:%S UTC");
 
-            let reply = warp::reply::Response::new(format!("sub: {}\ndomain: {}\nauthorized until: {}", &param.sub, &param.domain, valid_util).into());
+            let reply = warp::reply::Response::new(
+                format!(
+                    "sub: {}\ndomain: {}\nauthorized until: {}",
+                    &param.sub, &param.domain, valid_util
+                )
+                .into(),
+            );
             warp::reply::with_header(reply, "Set-Cookie", cookie)
         })
         .with(warp::reply::with::header("Content-Type", "text/plain"));
@@ -136,8 +141,7 @@ async fn main() {
         if cfg!(windows) {
             error!("Unix sockets are not supported on windows");
             process::exit(-1);
-        }
-        else {
+        } else {
             let socket_path = cfg.listen.strip_prefix("unix:").unwrap();
             let incoming = create_socket_file(socket_path, cfg.socket_group).unwrap();
 
@@ -149,10 +153,8 @@ async fn main() {
             // Cleanup socket file
             let _ = fs::remove_file(socket_path);
         }
-    }
-    else {
-        let server = warp::serve(services)
-            .run(cfg.listen.parse::<std::net::SocketAddr>().unwrap());
+    } else {
+        let server = warp::serve(services).run(cfg.listen.parse::<std::net::SocketAddr>().unwrap());
 
         select! {
             _ = server => (),
@@ -162,8 +164,11 @@ async fn main() {
 }
 
 #[cfg(any(unix, doc))]
-fn create_socket_file(socket_path: &str, group: Option<String>) -> Result<tokio_stream::wrappers::UnixListenerStream, Box<dyn Error>> {
-    use nix::unistd::{Group};
+fn create_socket_file(
+    socket_path: &str,
+    group: Option<String>,
+) -> Result<tokio_stream::wrappers::UnixListenerStream, Box<dyn Error>> {
+    use nix::unistd::Group;
     use tokio::net::UnixListener;
     use tokio_stream::wrappers::UnixListenerStream;
 
@@ -171,7 +176,8 @@ fn create_socket_file(socket_path: &str, group: Option<String>) -> Result<tokio_
     let _ = fs::remove_file(socket_path);
 
     // Set umask to o=rw,g=rw,o= before creating the socket file
-    let old_umask = nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
+    let old_umask =
+        nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
     let listener = UnixListener::bind(socket_path).unwrap();
 
     // Restore the umask
@@ -186,7 +192,13 @@ fn create_socket_file(socket_path: &str, group: Option<String>) -> Result<tokio_
     Ok(UnixListenerStream::new(listener))
 }
 
-fn generate_cookie(name: &str, sub: &str, duration: Duration, domain: &str, key: &str) -> Result<String, Box<dyn Error>> {
+fn generate_cookie(
+    name: &str,
+    sub: &str,
+    duration: Duration,
+    domain: &str,
+    key: &str,
+) -> Result<String, Box<dyn Error>> {
     Ok(Cookie::build(name, generate_token(sub, duration, key)?)
         .domain(domain)
         .path("/")
@@ -197,7 +209,11 @@ fn generate_cookie(name: &str, sub: &str, duration: Duration, domain: &str, key:
         .to_string())
 }
 
-fn generate_token(sub: &str, duration: Duration, key: &str) -> Result<String, jsonwebtoken::errors::Error> {
+fn generate_token(
+    sub: &str,
+    duration: Duration,
+    key: &str,
+) -> Result<String, jsonwebtoken::errors::Error> {
     let claims = Claims {
         sub: sub.into(),
         exp: (time::OffsetDateTime::now_utc() + duration).unix_timestamp(),
@@ -225,4 +241,3 @@ fn check_token(token: &str, sub: &str, key: &str) -> Result<Claims, Box<dyn Erro
     )?
     .claims)
 }
-
