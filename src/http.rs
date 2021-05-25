@@ -10,6 +10,7 @@ use cookie::Cookie;
 use log::{error};
 use time::Duration;
 use tokio::{select, signal};
+use warp::{self, filters, Filter};
 
 
 /// Generate a cookie with the given authorization
@@ -58,11 +59,67 @@ pub fn create_socket_file(
     Ok(UnixListenerStream::new(listener))
 }
 
-pub async fn run_server<F>(cfg: &Config, services: F)
-where
-    F: warp::Filter + Clone + Send + Sync + 'static,
-    F::Extract: warp::Reply
+pub async fn run_server(cfg: &Config)
 {
+    let secret_key: &'static str;
+
+    // Get the secret and 'leak' it, otherwise it can not easily be used in the warp:: expressions
+    if cfg.secret.is_some() && cfg.secret_file.is_some() {
+        error!("Do not specify both secret and secret_file");
+        process::exit(-1);
+    } else if let Some(secret) = cfg.secret.clone() {
+        secret_key = Box::leak(secret.into_boxed_str());
+    } else if let Some(secret_file) = cfg.secret_file.clone() {
+        secret_key = Box::leak(
+            fs::read_to_string(secret_file)
+                .expect("file 'secret' not found, exiting")
+                .trim()
+                .to_string()
+                .into_boxed_str(),
+        );
+    } else {
+        error!("No secret defined");
+        process::exit(-1);
+    }
+
+    let cookie_name: &'static str = Box::leak(cfg.cookie_name.clone().into_boxed_str());
+
+    let check_request = warp::path!("check" / String)
+        .and(filters::cookie::cookie(cookie_name))
+        .map(move |sub: String, cookie: String| {
+            match auth::check_token(&cookie, &sub, &secret_key).is_ok() {
+                false => warp::http::StatusCode::UNAUTHORIZED,
+                true => warp::http::StatusCode::OK,
+            }
+        });
+
+    let generate_request = warp::path!("generate")
+        .and(warp::query::<auth::AuthParameter>())
+        .map(move |param: auth::AuthParameter| {
+            let duration = Duration::seconds(param.duration as i64);
+            let cookie = http::generate_cookie(
+                cookie_name,
+                &param,
+                &secret_key,
+            )
+            .unwrap();
+
+            let valid_util =
+                (time::OffsetDateTime::now_utc() + duration).format("%Y-%m-%d %H:%M:%S UTC");
+
+            let reply = warp::reply::Response::new(
+                format!(
+                    "sub: {}\ndomain: {}\nauthorized until: {}",
+                    &param.sub, &param.domain, valid_util
+                )
+                .into(),
+            );
+            warp::reply::with_header(reply, "Set-Cookie", cookie)
+        })
+        .with(warp::reply::with::header("Content-Type", "text/plain"));
+
+    let services = check_request.or(generate_request);
+
     if cfg.listen.starts_with("unix:") {
         if cfg!(windows) {
             error!("Unix sockets are not supported on windows");
