@@ -2,6 +2,7 @@ use crate::auth;
 use crate::Config;
 use crate::http;
 
+use std::convert::Infallible;
 use std::error::Error;
 use std::fs;
 use std::process;
@@ -10,8 +11,9 @@ use cookie::Cookie;
 use log::{error};
 use time::Duration;
 use tokio::{select, signal};
-use warp::{self, filters, Filter};
 
+use warp::{self, filters, Filter, Rejection, Reply};
+use warp::http::StatusCode;
 
 /// Generate a cookie with the given authorization
 pub fn generate_cookie(
@@ -57,6 +59,22 @@ pub fn create_socket_file(
     }
 
     Ok(UnixListenerStream::new(listener))
+}
+
+async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
+    let code;
+
+    if err.is_not_found() {
+        code = StatusCode::NOT_FOUND;
+    }
+    else if let Some(e) = err.find::<warp::reject::MissingCookie>() {
+        code = StatusCode::UNAUTHORIZED;
+    }
+    else {
+        code = StatusCode::INTERNAL_SERVER_ERROR;
+    }
+
+    Ok(code)
 }
 
 pub async fn run_server(cfg: &Config)
@@ -118,7 +136,7 @@ pub async fn run_server(cfg: &Config)
         })
         .with(warp::reply::with::header("Content-Type", "text/plain"));
 
-    let services = check_request.or(generate_request);
+    let services = check_request.or(generate_request).recover(handle_rejection);
 
     if cfg.listen.starts_with("unix:") {
         if cfg!(windows) {
