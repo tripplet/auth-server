@@ -68,7 +68,7 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
     }
-    else if let Some(e) = err.find::<warp::reject::MissingCookie>() {
+    else if let Some(_) = err.find::<warp::reject::MissingCookie>() {
         code = StatusCode::UNAUTHORIZED;
     }
     else {
