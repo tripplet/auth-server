@@ -7,7 +7,7 @@ use std::error::Error;
 use std::fs;
 use std::process;
 
-use cookie::Cookie;
+use cookie::{Cookie, SameSite};
 use log::{error};
 use time::Duration;
 use tokio::{select, signal};
@@ -26,6 +26,7 @@ pub fn generate_cookie(
         .path("/")
         .secure(true)
         .http_only(true)
+        .same_site(SameSite::Strict)
         .max_age(Duration::seconds(param.duration as i64))
         .finish()
         .to_string())
