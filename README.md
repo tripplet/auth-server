@@ -22,3 +22,28 @@ OPTIONS:
         --secret-file <secret-file>      Read secret from file [env: SECRET_FILE]
         --socket-group <socket-group>    Set the group of the unix socket file to the given group [env: SOCKET_GROUP=]
 ```
+
+## Example nginx configuration
+
+```nginx
+server {
+    ...
+
+    location / {
+        auth_request /internal-cookie-auth;
+
+        include proxy_pass;
+        proxy_pass http://localhost:8080;
+    }
+
+    location /internal-cookie-auth {
+        internal;
+
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+
+        include proxy_pass;
+        proxy_pass http://unix:/run/auth-server/listen.sock:/check/SUBJECTNAME;
+    }
+}
+```
