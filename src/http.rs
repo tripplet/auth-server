@@ -70,6 +70,9 @@ async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     else if let Some(_) = err.find::<warp::reject::MissingCookie>() {
         code = StatusCode::UNAUTHORIZED;
     }
+    else if let Some(_) = err.find::<warp::reject::InvalidHeader>() {
+        code = StatusCode::UNAUTHORIZED;
+    }
     else {
         code = StatusCode::INTERNAL_SERVER_ERROR;
     }
