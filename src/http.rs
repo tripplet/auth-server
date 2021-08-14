@@ -142,7 +142,10 @@ pub async fn run_server(cfg: &Config)
         if cfg!(windows) {
             error!("Unix sockets are not supported on windows");
             process::exit(-1);
-        } else {
+        }
+
+        #[cfg(any(unix, doc))]
+        {
             let socket_path = cfg.listen.strip_prefix("unix:").unwrap();
             let incoming = http::create_socket_file(socket_path, cfg.socket_group.as_deref()).unwrap();
 
