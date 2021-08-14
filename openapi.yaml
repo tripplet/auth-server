@@ -1,0 +1,59 @@
+openapi: 3.0.0
+info:
+  title: Authentication API
+  version: "1.1"
+servers:
+  - url: http://localhost:14314
+paths:
+  /generate:
+    get:
+      summary: Generate an authorization cookie
+      parameters:
+      - name: sub
+        in: query
+        description: Subject
+        required: true
+        schema:
+          type: string
+      - name: domain
+        in: query
+        description: Domain
+        required: true
+        schema:
+          type: string
+      - name: duration
+        in: query
+        description: Duration how long the cookie is valid (in seconds)
+        required: true
+        schema:
+          type: integer
+          minimum: 0
+          
+      responses:
+        '200':
+          description: OK
+          headers: 
+            REQUEST_AUTHORIZATION_TOKEN:
+              schema:
+                type: string
+  /check/{sub}:
+    get:
+      summary: Check a request for a valid authorization token
+      parameters:
+      - name: sub
+        in: path
+        description: Subject
+        required: true
+        schema:
+          type: string
+      - name: REQUEST_AUTHORIZATION_TOKEN
+        in: header
+        description: Request Authorization Token
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Authorized
+        '401':
+          description: Not authorized
