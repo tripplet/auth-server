@@ -34,7 +34,7 @@ pub fn check_token(token: &str, sub: &str, key: &str) -> Result<Claims, Box<dyn 
     .claims)
 }
 
-/// Generate an autthorization token
+/// Generate an authorization token
 pub fn generate_token(
     param: &AuthParameter,
     key: &str,

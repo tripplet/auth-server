@@ -46,8 +46,7 @@ pub fn create_socket_file(
     let _ = fs::remove_file(socket_path);
 
     // Set umask to o=rw,g=rw,o= before creating the socket file
-    let old_umask =
-        nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
+    let old_umask = nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
     let listener = UnixListener::bind(socket_path).unwrap();
 
     // Restore the umask
