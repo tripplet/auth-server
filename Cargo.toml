@@ -8,17 +8,17 @@ edition = "2018"
 tokio = { version = "1", features = ["full"] }
 warp = "0.3"
 log = "^0.4"
-simple_logger = {version = "^1.11", default-features = false }
+simple_logger = {version = "^1.13", default-features = false }
 serde = "^1.0"
-regex = "^1.4"
+regex = "^1.5"
 jsonwebtoken = "^7.2"
-time = "^0.2"
+time = "0.2.11" # must match dependency in cookie
 cookie = "^0.15"
-tokio-stream = { version = "0.1.1", features = ["net"] }
+tokio-stream = { version = "0.1.7", features = ["net"] }
 structopt = { version = "^0.3", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
-nix = "^0.20"
+nix = "^0.22"
 
 [profile.release]
 #debug = true
