@@ -6,41 +6,41 @@ use log::LevelFilter;
 use simple_logger::SimpleLogger;
 
 // Commandline parsing
-use structopt::StructOpt;
+use clap::Parser;
 
 // The main config
-#[derive(Debug, StructOpt)]
-#[structopt(about = "Service for authenticating requests from nginx (ngx_http_auth_request_module).")]
+#[derive(Debug, Parser)]
+#[clap(version, about = "Service for authenticating requests from nginx (ngx_http_auth_request_module).")]
 pub struct Config {
     /// Address to listen on, can also be a unix socket (unix:/tmp/auth-server.sock)
-    #[structopt(long, default_value = "127.0.0.1:14314", env)]
+    #[clap(long, default_value = "127.0.0.1:14314", env)]
     listen: String,
 
     /// Set the group of the unix socket file to the given group
-    #[structopt(long, env)]
+    #[clap(long, env)]
     socket_group: Option<String>,
 
     /// Secret secret to use
-    #[structopt(long, env, hide_env_values = true)]
+    #[clap(long, env, hide_env_values = true)]
     secret: Option<String>,
 
     /// Read secret from file
-    #[structopt(long, env, hide_env_values = true)]
+    #[clap(long, env, hide_env_values = true)]
     secret_file: Option<String>,
 
     /// The name of the cookie
-    #[structopt(long, env, default_value = "REQUEST_AUTHORIZATION_TOKEN")]
+    #[clap(long, env, default_value = "REQUEST_AUTHORIZATION_TOKEN")]
     cookie_name: String,
 
     /// Verbose mode
-    #[structopt(short, long)]
+    #[clap(short, long)]
     verbose: bool,
 }
 
 #[tokio::main]
 async fn main() {
     // Parse arguments
-    let cfg = Config::from_args();
+    let cfg = Config::parse();
 
     // Initialize logger
     SimpleLogger::new().init().unwrap();

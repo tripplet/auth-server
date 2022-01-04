@@ -1,6 +1,6 @@
 use crate::auth;
-use crate::Config;
 use crate::http;
+use crate::Config;
 
 use std::convert::Infallible;
 use std::error::Error;
@@ -8,12 +8,12 @@ use std::fs;
 use std::process;
 
 use cookie::{Cookie, SameSite};
-use log::{error};
-use time::Duration;
+use log::error;
+use time::{macros::format_description, Duration};
 use tokio::{select, signal};
 
-use warp::{self, filters, Filter, Rejection, Reply};
 use warp::http::StatusCode;
+use warp::{self, filters, Filter, Rejection, Reply};
 
 /// Generate a cookie with the given authorization
 pub fn generate_cookie(
@@ -61,27 +61,24 @@ pub fn create_socket_file(
     Ok(UnixListenerStream::new(listener))
 }
 
+#[allow(clippy::if_same_then_else)]
 async fn handle_rejection(err: Rejection) -> Result<impl Reply, Infallible> {
     let code;
 
     if err.is_not_found() {
         code = StatusCode::NOT_FOUND;
-    }
-    else if let Some(_) = err.find::<warp::reject::MissingCookie>() {
+    } else if err.find::<warp::reject::MissingCookie>().is_some() {
         code = StatusCode::UNAUTHORIZED;
-    }
-    else if let Some(_) = err.find::<warp::reject::InvalidHeader>() {
+    } else if err.find::<warp::reject::InvalidHeader>().is_some() {
         code = StatusCode::UNAUTHORIZED;
-    }
-    else {
+    } else {
         code = StatusCode::INTERNAL_SERVER_ERROR;
     }
 
     Ok(code)
 }
 
-pub async fn run_server(cfg: &Config)
-{
+pub async fn run_server(cfg: &Config) {
     let secret_key: &'static str;
 
     // Get the secret and 'leak' it, otherwise it can not easily be used in the warp:: expressions
@@ -108,7 +105,7 @@ pub async fn run_server(cfg: &Config)
     let check_request = warp::path!("check" / String)
         .and(filters::cookie::cookie(cookie_name))
         .map(move |sub: String, cookie: String| {
-            match auth::check_token(&cookie, &sub, &secret_key).is_ok() {
+            match auth::check_token(&cookie, &sub, secret_key).is_ok() {
                 false => warp::http::StatusCode::UNAUTHORIZED,
                 true => warp::http::StatusCode::OK,
             }
@@ -118,20 +115,19 @@ pub async fn run_server(cfg: &Config)
         .and(warp::query::<auth::AuthParameter>())
         .map(move |param: auth::AuthParameter| {
             let duration = Duration::seconds(param.duration as i64);
-            let cookie = http::generate_cookie(
-                cookie_name,
-                &param,
-                &secret_key,
-            )
-            .unwrap();
+            let cookie = http::generate_cookie(cookie_name, &param, secret_key).unwrap();
 
-            let valid_util =
-                (time::OffsetDateTime::now_utc() + duration).format("%Y-%m-%d %H:%M:%S UTC");
+            let valid_util = (time::OffsetDateTime::now_utc() + duration).format(
+                format_description!("[year]-[month]-[day] [hour]:[minute] UTC"),
+            );
 
             let reply = warp::reply::Response::new(
                 format!(
                     "sub: {}\ndomain: {}\nauthorized until: {}",
-                    &param.sub, &param.domain, valid_util
+                    &param.sub,
+                    &param.domain,
+                    valid_util
+                        .unwrap_or_else(|err| format!("error generating valid_until: {}", err))
                 )
                 .into(),
             );

@@ -1,8 +1,8 @@
 [package]
 name = "auth-server"
-version = "1.1.0"
+version = "1.1.1"
 authors = ["Tobias Tangemann <tobias@tangemann.org>"]
-edition = "2018"
+edition = "2021"
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
@@ -12,13 +12,13 @@ simple_logger = {version = "^1.13", default-features = false }
 serde = "^1.0"
 regex = "^1.5"
 jsonwebtoken = "^7.2"
-time = "0.2.11" # must match dependency in cookie
-cookie = "^0.15"
+time = {version =  "0.3.5", features = ["formatting"] } # must match dependency in cookie
+cookie = "^0.16"
 tokio-stream = { version = "0.1.7", features = ["net"] }
-structopt = { version = "^0.3", default-features = false }
+clap = { version = "3.0", features = ["derive", "env"] }
 
 [target.'cfg(unix)'.dependencies]
-nix = "^0.22"
+nix = "^0.23"
 
 [profile.release]
 #debug = true

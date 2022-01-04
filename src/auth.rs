@@ -27,7 +27,7 @@ pub fn check_token(token: &str, sub: &str, key: &str) -> Result<Claims, Box<dyn 
     };
 
     Ok(decode::<Claims>(
-        &token,
+        token,
         &DecodingKey::from_secret(key.as_ref()),
         &jwt_validation,
     )?
@@ -40,13 +40,13 @@ pub fn generate_token(
     key: &str,
 ) -> Result<String, jsonwebtoken::errors::Error> {
     let claims = Claims {
-        sub: param.sub.clone().into(),
+        sub: param.sub.clone(),
         exp: (time::OffsetDateTime::now_utc() + Duration::seconds(param.duration as i64)).unix_timestamp(),
     };
 
-    Ok(encode(
+    encode(
         &Header::new(Algorithm::HS256),
         &claims,
         &EncodingKey::from_secret(key.as_ref()),
-    )?)
+    )
 }
