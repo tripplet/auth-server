@@ -17,6 +17,9 @@ cookie = "^0.16"
 tokio-stream = { version = "0.1.7", features = ["net"] }
 clap = { version = "3.0", features = ["derive", "env"] }
 
+[dev-dependencies]
+base64 = "0.13"
+
 [target.'cfg(unix)'.dependencies]
 nix = "^0.23"
 

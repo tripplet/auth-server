@@ -21,7 +21,7 @@ pub fn generate_cookie(
     param: &auth::AuthParameter,
     key: &str,
 ) -> Result<String, Box<dyn Error>> {
-    Ok(Cookie::build(name, auth::generate_token(param, key)?)
+    Ok(Cookie::build(name, param.generate_token(key)?)
         .domain(param.domain.clone())
         .path("/")
         .secure(true)
