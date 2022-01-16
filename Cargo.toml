@@ -1,6 +1,6 @@
 [package]
 name = "auth-server"
-version = "1.1.1"
+version = "1.1.2"
 authors = ["Tobias Tangemann <tobias@tangemann.org>"]
 edition = "2021"
 
