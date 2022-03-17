@@ -59,7 +59,7 @@ pub fn check_token(token: &str, sub: &str, key: &str) -> Result<Claims, Box<dyn 
 mod tests {
     use super::*;
 
-    use base64::encode;
+    use base64;
 
     #[test]
     fn generate_token() {
@@ -76,8 +76,8 @@ mod tests {
 
         assert_eq!(
             [
-                encode(r#"{"typ":"JWT","alg":"HS256"}"#),
-                encode(format!(
+                base64::encode(r#"{"typ":"JWT","alg":"HS256"}"#),
+                base64::encode(format!(
                     r#"{{"sub":"{}","exp":{}}}"#,
                     param.sub, param.duration
                 ))
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn invalid_token() {
         assert!(matches!(
-            dbg!(super::check_token("", "some-service", "secret"))
+            super::check_token("", "some-service", "secret")
                 .unwrap_err()
                 .downcast_ref::<jsonwebtoken::errors::Error>()
                 .unwrap()
@@ -166,12 +166,66 @@ mod tests {
         ));
 
         assert!(matches!(
-            dbg!(super::check_token("a.b.c", "some-service", "secret"))
+            super::check_token("a.b.c", "some-service", "secret")
                 .unwrap_err()
                 .downcast_ref::<jsonwebtoken::errors::Error>()
                 .unwrap()
                 .kind(),
             jsonwebtoken::errors::ErrorKind::Base64(..)
+        ));
+    }
+
+    #[test]
+    fn changed_sub_should_be_invalid() {
+        let key = "secretkey";
+        let param = AuthParameter {
+            domain: "unused-here".to_string(),
+            duration: 60 * 60 * 24 * 365 * 1000, // valid for ~1000 years should be enough
+            sub: "service1".to_string(),
+        };
+
+        let token = param
+            .generate_token_at_moment(key, time::OffsetDateTime::UNIX_EPOCH)
+            .unwrap();
+
+        assert!(matches!(
+            super::check_token(&token, "invalid-other-service", key)
+                .unwrap_err()
+                .downcast_ref::<jsonwebtoken::errors::Error>()
+                .unwrap()
+                .kind(),
+            jsonwebtoken::errors::ErrorKind::InvalidSubject
+        ));
+    }
+
+    #[test]
+    fn missing_sub_should_be_invalid() {
+        #[derive(Debug, Serialize, Deserialize)]
+        struct TestClaims {
+            exp: usize,
+        }
+
+        let key = "secretkey";
+        let claims = TestClaims {
+            exp: 60 * 60 * 24 * 365 * 1000,
+        };
+
+        let token = encode(
+            &Header::new(Algorithm::HS256),
+            &claims,
+            &EncodingKey::from_secret(key.as_ref()),
+        )
+        .unwrap();
+
+        let err = super::check_token(&token, "valid-service", key).unwrap_err();
+        let err_kind = err
+            .downcast_ref::<jsonwebtoken::errors::Error>()
+            .unwrap()
+            .kind();
+
+        assert!(matches!(
+            err_kind, jsonwebtoken::errors::ErrorKind::Json(serde_err)
+                if serde_err.to_string().contains("missing field `sub`")
         ));
     }
 }
