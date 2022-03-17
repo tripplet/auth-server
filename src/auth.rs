@@ -43,12 +43,9 @@ impl AuthParameter {
 
 /// Check an authorization token
 pub fn check_token(token: &str, sub: &str, key: &str) -> Result<Claims, Box<dyn Error>> {
-    let jwt_validation = Validation {
-        algorithms: vec![Algorithm::HS256],
-        validate_exp: true,
-        sub: Some(sub.to_string()),
-        ..Validation::default()
-    };
+    let mut jwt_validation = Validation::new(Algorithm::HS256);
+    jwt_validation.leeway = 30;
+    jwt_validation.sub = Some(sub.to_string());
 
     Ok(decode::<Claims>(
         token,

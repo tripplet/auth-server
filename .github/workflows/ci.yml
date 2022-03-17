@@ -17,4 +17,3 @@ jobs:
         with:
           command: build
           args: --release --locked --all-features
-      #- run: strip "target/release/auth-server"
