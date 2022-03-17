@@ -6,15 +6,15 @@ use log::LevelFilter;
 use simple_logger::SimpleLogger;
 
 // Commandline parsing
-use clap::{Parser, ArgGroup};
+use clap::{ArgGroup, Parser};
 
 // The main config
 #[derive(Debug, Parser)]
-#[clap(version, about = "Service for authenticating requests from nginx (ngx_http_auth_request_module).")]
+#[clap(version)]
 #[clap(group(ArgGroup::new("secrets").required(true)))]
 pub struct Config {
     /// Address to listen on, can also be a unix socket (unix:/tmp/auth-server.sock)
-    #[clap(long, default_value = "127.0.0.1:14314", env)]
+    #[clap(long, env, default_value = "127.0.0.1:14314")]
     listen: String,
 
     /// Set the group of the unix socket file to the given group
