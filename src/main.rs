@@ -1,5 +1,6 @@
 mod auth;
 mod http;
+mod listen;
 
 // Logging
 use log::LevelFilter;
@@ -8,14 +9,25 @@ use simple_logger::SimpleLogger;
 // Commandline parsing
 use clap::{ArgGroup, Parser};
 
+// Allocator
+use mimalloc::MiMalloc;
+
+#[global_allocator]
+static GLOBAL: MiMalloc = MiMalloc;
+
 // The main config
 #[derive(Debug, Parser)]
 #[clap(version)]
 #[clap(group(ArgGroup::new("secrets").required(true)))]
 pub struct Config {
-    /// Address to listen on, can also be a unix socket (unix:/tmp/auth-server.sock)
+    /// Address to listen on like 127.0.0.1:14314, can also be a unix socket (e.g. unix:/tmp/auth-server.sock)
     #[clap(long, env, default_value = "127.0.0.1:14314")]
-    listen: String,
+    listen: listen::Socket,
+
+    /// Timeout after which the programs waits for new requests afterwards it exists (used for
+    /// systemd socket activation
+    #[clap(long, env, default_value = "30")]
+    systemd_activation_idle: u16,
 
     /// Set the group of the unix socket file to the given group
     #[clap(long, env)]
@@ -38,8 +50,9 @@ pub struct Config {
     verbose: bool,
 }
 
-#[tokio::main]
-async fn main() {
+
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     // Parse arguments
     let cfg = Config::parse();
 
@@ -52,4 +65,5 @@ async fn main() {
     }
 
     http::run_server(&cfg).await;
+    Ok(())
 }

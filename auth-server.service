@@ -2,12 +2,12 @@
 Description=Authentication server for nginx
 BindsTo=nginx.service
 
-
 [Service]
 RuntimeDirectory=auth-server
-Environment="SECRET_FILE=/srv/http/data/auth-secret"
 Environment="LISTEN=unix:/run/auth-server/listen.sock"
 Environment="SOCKET_GROUP=http-auth"
+EnvironmentFile=/etc/conf.d/auth-server
+SupplementaryGroups=http-auth
 
 ExecStart=/usr/bin/auth-server
 Restart=on-failure
@@ -21,8 +21,6 @@ ProtectControlGroups=true
 SystemCallArchitectures=native
 MemoryDenyWriteExecute=true
 NoNewPrivileges=true
-
-SupplementaryGroups=http-auth
 
 [Install]
 WantedBy=multi-user.target
