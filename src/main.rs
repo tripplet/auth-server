@@ -50,9 +50,8 @@ pub struct Config {
     verbose: bool,
 }
 
-
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() {
     // Parse arguments
     let cfg = Config::parse();
 
@@ -65,5 +64,4 @@ async fn main() -> std::io::Result<()> {
     }
 
     http::run_server(&cfg).await;
-    Ok(())
 }

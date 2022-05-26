@@ -1,17 +1,19 @@
 use crate::auth;
 use crate::http;
-use crate::Config;
 use crate::listen;
+use crate::Config;
 
 use std::error::Error;
 use std::fs;
 use std::process;
 
+use actix_web::middleware::{Condition, Logger};
+use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+
 use cookie::{Cookie, SameSite};
 use log::error;
 use time::{macros::format_description, Duration};
 use tokio::{select, signal};
-use actix_web::{get, web, middleware::Logger, middleware::Condition, App, HttpResponse, HttpServer, Responder, HttpRequest};
 
 struct AppState {
     cookie_name: String,
@@ -19,7 +21,11 @@ struct AppState {
 }
 
 #[get("/check/{sub}")]
-async fn check(req: HttpRequest, path: web::Path<String>, data: web::Data<AppState>) -> impl Responder {
+async fn check(
+    req: HttpRequest,
+    path: web::Path<String>,
+    data: web::Data<AppState>,
+) -> impl Responder {
     match req.cookie(&data.cookie_name) {
         None => HttpResponse::Unauthorized(),
         Some(cookie) => {
@@ -32,33 +38,33 @@ async fn check(req: HttpRequest, path: web::Path<String>, data: web::Data<AppSta
 }
 
 #[get("/generate")]
-async fn generate(param: web::Query<auth::AuthParameter>, data: web::Data<AppState>) -> impl Responder {
+async fn generate(
+    param: web::Query<auth::AuthParameter>,
+    data: web::Data<AppState>,
+) -> impl Responder {
     let duration = Duration::seconds(param.duration as i64);
     let cookie = http::generate_cookie(&data.cookie_name, &param, &data.secret_key).unwrap();
 
-    let valid_util = (time::OffsetDateTime::now_utc() + duration).format(
-        format_description!("[year]-[month]-[day] [hour]:[minute] UTC"),
-    );
+    let valid_util = (time::OffsetDateTime::now_utc() + duration).format(format_description!(
+        "[year]-[month]-[day] [hour]:[minute] UTC"
+    ));
 
     HttpResponse::Ok()
         .insert_header(("Content-Type", "text/plain"))
         .insert_header(("Set-Cookie", cookie))
-        .body(
-            format!(
-                "sub: {}\ndomain: {}\nauthorized until: {}",
-                &param.sub,
-                &param.domain,
-                valid_util
-                    .unwrap_or_else(|err| format!("error generating valid_until: {}", err))
-            )
-        )
+        .body(format!(
+            "sub: {}\ndomain: {}\nauthorized until: {}",
+            &param.sub,
+            &param.domain,
+            valid_util.unwrap_or_else(|err| format!("error generating valid_until: {}", err))
+        ))
 }
 
 pub async fn run_server(cfg: &Config) {
     let secret_key = if let Some(secret) = &cfg.secret {
         secret.clone()
     } else if let Some(secret_file) = &cfg.secret_file {
-       secret_file.clone()
+        secret_file.clone()
     } else {
         error!("No secret defined");
         process::exit(-1);
@@ -68,33 +74,38 @@ pub async fn run_server(cfg: &Config) {
     let cookie_name = cfg.cookie_name.clone();
     let verbose = cfg.verbose;
 
-    let server = HttpServer::new(move || App::new()
+    let server = HttpServer::new(move || {
+        App::new()
             .wrap(Condition::new(verbose, Logger::default()))
             .app_data(web::Data::new(AppState {
                 cookie_name: cookie_name.to_string(),
                 secret_key: secret_key.to_string(),
-        }))
-        .service(check).service(generate)
-    ).workers(1);
+            }))
+            .service(check)
+            .service(generate)
+    })
+    .workers(1);
 
     match &cfg.listen {
         #[cfg(feature = "systemd_socket_activation")]
         listen::Socket::Systemd => {
             let incoming = match socket_from_systemd_activation() {
-                Ok(Some(socket)) => { socket },
+                Ok(Some(socket)) => socket,
                 Ok(None) => {
-                    error!("No systemd socket activation provided"); process::exit(-2);
-                },
+                    error!("No systemd socket activation provided");
+                    process::exit(-2);
+                }
                 Err(err) => {
-                    error!("Error determining socket activation: {err}"); process::exit(-3);
-                },
+                    error!("Error determining socket activation: {err}");
+                    process::exit(-3);
+                }
             };
 
             select! {
                 _ = server.listen_uds(incoming).unwrap().run() => (),
                 _ = signal::ctrl_c() => (),
             }
-        },
+        }
         listen::Socket::File(path) => {
             if cfg!(windows) {
                 error!("Unix sockets are not supported on windows");
@@ -113,7 +124,7 @@ pub async fn run_server(cfg: &Config) {
                 // Cleanup socket file
                 let _ = fs::remove_file(&path);
             }
-        },
+        }
         listen::Socket::Address(addr) => {
             let server = server.bind(addr).unwrap().run();
 
@@ -155,7 +166,8 @@ fn create_socket_file(
     let _ = fs::remove_file(socket_path);
 
     // Set umask to o=rw,g=rw,o= before creating the socket file
-    let old_umask = nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
+    let old_umask =
+        nix::sys::stat::umask(nix::sys::stat::Mode::from_bits(0o117).expect("Invalid umask"));
     let listener = UnixListener::bind(socket_path)?;
 
     // Restore the umask
@@ -171,21 +183,18 @@ fn create_socket_file(
 }
 
 #[cfg(feature = "systemd_socket_activation")]
-pub fn socket_from_systemd_activation() -> Result<Option<std::os::unix::net::UnixListener>, Box<dyn Error>> {
+pub fn socket_from_systemd_activation(
+) -> Result<Option<std::os::unix::net::UnixListener>, Box<dyn Error>> {
     use libsystemd::activation;
-    use std::os::unix::net::UnixListener;
     use std::os::unix::io::{FromRawFd, IntoRawFd};
+    use std::os::unix::net::UnixListener;
 
     let mut fds = activation::receive_descriptors(true)?;
     if fds.is_empty() {
         Ok(None)
-    }
-    else if fds.len() == 1 {
-        unsafe {
-            Ok(Some(UnixListener::from_raw_fd(fds.remove(0).into_raw_fd())))
-        }
-    }
-    else {
+    } else if fds.len() == 1 {
+        unsafe { Ok(Some(UnixListener::from_raw_fd(fds.remove(0).into_raw_fd()))) }
+    } else {
         Err("Not supported".into())
     }
 }
