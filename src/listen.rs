@@ -4,6 +4,8 @@ use std::net::SocketAddr;
 pub enum Socket {
     File(String),
     Address(SocketAddr),
+
+    #[cfg(feature = "systemd_socket_activation")]
     Systemd,
 }
 
@@ -11,10 +13,12 @@ impl std::str::FromStr for Socket {
     type Err = String;
 
     fn from_str(input: &str) -> Result<Self, Self::Err> {
+        #[cfg(feature = "systemd_socket_activation")]
         if input == "systemd" {
-            Ok(Socket::Systemd)
+            return Ok(Socket::Systemd);
         }
-        else if input.starts_with("unix:") {
+
+        if input.starts_with("unix:") {
             Ok(Socket::File(input.strip_prefix("unix:").unwrap().into()))
         } else {
             Ok(Socket::Address(

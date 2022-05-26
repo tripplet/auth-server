@@ -78,28 +78,21 @@ pub async fn run_server(cfg: &Config) {
     ).workers(1);
 
     match &cfg.listen {
+        #[cfg(feature = "systemd_socket_activation")]
         listen::Socket::Systemd => {
-            if cfg!(windows) {
-                error!("Unix sockets are not supported on windows");
-                process::exit(-1);
-            }
+            let incoming = match socket_from_systemd_activation() {
+                Ok(Some(socket)) => { socket },
+                Ok(None) => {
+                    error!("No systemd socket activation provided"); process::exit(-2);
+                },
+                Err(err) => {
+                    error!("Error determining socket activation: {err}"); process::exit(-3);
+                },
+            };
 
-            #[cfg(any(unix, doc))]
-            {
-                let incoming = match socket_from_systemd_activation() {
-                    Ok(Some(socket)) => { socket },
-                    Ok(None) => {
-                        error!("No systemd socket activation provided"); process::exit(-2);
-                    },
-                    Err(err) => {
-                        error!("Error determining socket activation: {err}"); process::exit(-3);
-                    },
-                };
-
-                select! {
-                    _ = server.listen_uds(incoming).unwrap().run() => (),
-                    _ = signal::ctrl_c() => (),
-                }
+            select! {
+                _ = server.listen_uds(incoming).unwrap().run() => (),
+                _ = signal::ctrl_c() => (),
             }
         },
         listen::Socket::File(path) => {
