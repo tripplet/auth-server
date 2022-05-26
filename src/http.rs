@@ -10,23 +10,20 @@ use std::process;
 use cookie::{Cookie, SameSite};
 use log::error;
 use time::{macros::format_description, Duration};
-use tokio::{select, signal, sync::mpsc, time::sleep};
+use tokio::{select, signal};
 use actix_web::{get, web, middleware::Logger, middleware::Condition, App, HttpResponse, HttpServer, Responder, HttpRequest};
 
-struct AppState<'a, 'b> {
-    cookie_name: &'a str,
-    secret_key: &'b str,
-    timeout: std::sync::Arc<mpsc::Sender<()>>,
+struct AppState {
+    cookie_name: String,
+    secret_key: String,
 }
 
 #[get("/check/{sub}")]
-async fn check(req: HttpRequest, path: web::Path<String>, data: web::Data<AppState<'_, '_>>) -> impl Responder {
-    _ = data.timeout.try_send(());
-
-    match req.cookie(data.cookie_name) {
+async fn check(req: HttpRequest, path: web::Path<String>, data: web::Data<AppState>) -> impl Responder {
+    match req.cookie(&data.cookie_name) {
         None => HttpResponse::Unauthorized(),
         Some(cookie) => {
-            match auth::check_token(cookie.value(), &path.into_inner(), data.secret_key).is_ok() {
+            match auth::check_token(cookie.value(), &path.into_inner(), &data.secret_key).is_ok() {
                 false => HttpResponse::Unauthorized(),
                 true => HttpResponse::Ok(),
             }
@@ -35,11 +32,9 @@ async fn check(req: HttpRequest, path: web::Path<String>, data: web::Data<AppSta
 }
 
 #[get("/generate")]
-async fn generate(param: web::Query<auth::AuthParameter>, data: web::Data<AppState<'_, '_>>) -> impl Responder {
-    _ = data.timeout.try_send(());
-
+async fn generate(param: web::Query<auth::AuthParameter>, data: web::Data<AppState>) -> impl Responder {
     let duration = Duration::seconds(param.duration as i64);
-    let cookie = http::generate_cookie(data.cookie_name, &param, data.secret_key).unwrap();
+    let cookie = http::generate_cookie(&data.cookie_name, &param, &data.secret_key).unwrap();
 
     let valid_util = (time::OffsetDateTime::now_utc() + duration).format(
         format_description!("[year]-[month]-[day] [hour]:[minute] UTC"),
@@ -60,35 +55,24 @@ async fn generate(param: web::Query<auth::AuthParameter>, data: web::Data<AppSta
 }
 
 pub async fn run_server(cfg: &Config) {
-    let secret_key: &'static str;
-
-    // Get the secret and 'leak' it, otherwise it can not easily be used in the web::Data expressions
-    if let Some(secret) = cfg.secret.clone() {
-        secret_key = Box::leak(secret.into_boxed_str());
-    } else if let Some(secret_file) = cfg.secret_file.clone() {
-        secret_key = Box::leak(
-            fs::read_to_string(secret_file)
-                .expect("file 'secret' not found, exiting")
-                .trim()
-                .to_string()
-                .into_boxed_str(),
-        );
+    let secret_key = if let Some(secret) = &cfg.secret {
+        secret.clone()
+    } else if let Some(secret_file) = &cfg.secret_file {
+       secret_file.clone()
     } else {
         error!("No secret defined");
         process::exit(-1);
-    }
+    };
 
-    let (tx, mut rx) = mpsc::channel(1);
-    let tx_send = std::sync::Arc::new(tx);
-    let cookie_name: &'static str = Box::leak(cfg.cookie_name.clone().into_boxed_str());
+    // Avoid capturing cfg
+    let cookie_name = cfg.cookie_name.clone();
     let verbose = cfg.verbose;
 
     let server = HttpServer::new(move || App::new()
             .wrap(Condition::new(verbose, Logger::default()))
             .app_data(web::Data::new(AppState {
-                cookie_name: cookie_name.clone(),
-                secret_key,
-                timeout: tx_send.clone(),
+                cookie_name: cookie_name.to_string(),
+                secret_key: secret_key.to_string(),
         }))
         .service(check).service(generate)
     ).workers(1);
@@ -112,24 +96,9 @@ pub async fn run_server(cfg: &Config) {
                     },
                 };
 
-                let running_server = server.listen_uds(incoming).unwrap().run();
-
-                tokio::spawn(async move {
-                    // Process each socket concurrently.
-                    running_server.await
-                });
-
-
-                loop {
-                    let sl = sleep(std::time::Duration::from_secs(3));
-
-                    select! {
-                        _ = signal::ctrl_c() =>  { break; },
-                        _ = sl => { break; },
-                        _ = rx.recv() => (),
-                    }
-
-                    dbg!("loop");
+                select! {
+                    _ = server.listen_uds(incoming).unwrap().run() => (),
+                    _ = signal::ctrl_c() => (),
                 }
             }
         },
