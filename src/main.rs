@@ -26,6 +26,7 @@ pub struct Config {
 
     /// Timeout after which the programs waits for new requests afterwards it exists (used for
     /// systemd socket activation
+    #[cfg(feature = "systemd_socket_activation")]
     #[clap(long, env, default_value = "30")]
     systemd_activation_idle: u16,
 

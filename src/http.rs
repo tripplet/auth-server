@@ -4,13 +4,12 @@ use crate::listen;
 use crate::Config;
 
 use std::error::Error;
-use std::fs;
 use std::process;
 
+use actix_web::cookie::{Cookie, SameSite};
 use actix_web::middleware::{Condition, Logger};
 use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 
-use cookie::{Cookie, SameSite};
 use log::error;
 use time::{macros::format_description, Duration};
 use tokio::{select, signal};
@@ -108,6 +107,7 @@ pub async fn run_server(cfg: &Config) {
         }
         listen::Socket::File(path) => {
             if cfg!(windows) {
+                _ = path;
                 error!("Unix sockets are not supported on windows");
                 process::exit(-1);
             }
@@ -122,7 +122,7 @@ pub async fn run_server(cfg: &Config) {
                 }
 
                 // Cleanup socket file
-                let _ = fs::remove_file(&path);
+                let _ = std::fs::remove_file(&path);
             }
         }
         listen::Socket::Address(addr) => {
@@ -163,7 +163,7 @@ fn create_socket_file(
     use std::os::unix::net::UnixListener;
 
     // Try removing an old existing socket file
-    let _ = fs::remove_file(socket_path);
+    let _ = std::fs::remove_file(socket_path);
 
     // Set umask to o=rw,g=rw,o= before creating the socket file
     let old_umask =

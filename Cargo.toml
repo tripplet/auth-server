@@ -6,22 +6,20 @@ description = "Service for authenticating requests from nginx (ngx_http_auth_req
 edition = "2021"
 
 [dependencies]
-actix-web = "4"
+actix-web = { version = "4", default-features = false, features = [ "macros", "cookies" ] }
 tokio = { version = "1", features = [ "macros" ] }
 log = "^0.4"
-simple_logger = { version = "^2.1", default-features = false }
-serde = "^1.0"
+simple_logger = { version = "2.1", default-features = false }
+serde = "1.0"
 jsonwebtoken = { version = "8", default-features = false }
-time = { version = "0.3.5", features = ["formatting"] } # must match dependency in cookie
-cookie = "^0.16"
+time = { version = "0.3", features = ["formatting"] }
 clap = { version = "3.0", features = ["derive", "env"] }
-mimalloc = { version = "^0.1.29", default-features = false }
+mimalloc = { version = "0.1.29", default-features = false }
 
 [dev-dependencies]
 base64 = "0.13"
 
 [features]
-default = ["systemd_socket_activation"]
 systemd_socket_activation = ["libsystemd"]
 
 [target.'cfg(unix)'.dependencies]
