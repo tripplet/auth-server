@@ -44,19 +44,20 @@ async fn generate(
     let duration = Duration::seconds(param.duration as i64);
     let cookie = http::generate_cookie(&data.cookie_name, &param, &data.secret_key).unwrap();
 
-    let valid_util = (time::OffsetDateTime::now_utc() + duration).format(format_description!(
+    let valid_until = (time::OffsetDateTime::now_utc() + duration).format(format_description!(
         "[year]-[month]-[day] [hour]:[minute] UTC"
     ));
 
-    HttpResponse::Ok()
-        .insert_header(("Content-Type", "text/plain"))
-        .insert_header(("Set-Cookie", cookie))
-        .body(format!(
-            "sub: {}\ndomain: {}\nauthorized until: {}",
-            &param.sub,
-            &param.domain,
-            valid_util.unwrap_or_else(|err| format!("error generating valid_until: {}", err))
-        ))
+    match valid_until {
+        Err(err) => HttpResponse::InternalServerError().body(err.to_string()),
+        Ok(valid_until) => HttpResponse::Ok()
+            .insert_header(("Content-Type", "text/plain"))
+            .insert_header(("Set-Cookie", cookie))
+            .body(format!(
+                "sub: {}\ndomain: {}\nauthorized until: {}",
+                &param.sub, &param.domain, valid_until
+            )),
+    }
 }
 
 pub async fn run_server(cfg: &Config) {
@@ -176,7 +177,7 @@ fn create_socket_file(
     // Set socket group owner and permissions
     if let Some(socket_group) = group {
         let group = Group::from_name(socket_group)?.ok_or("group not found")?;
-        let _ = nix::unistd::chown(socket_path, None, Some(group.gid))?;
+        nix::unistd::chown(socket_path, None, Some(group.gid))?;
     }
 
     Ok(listener)
