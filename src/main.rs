@@ -10,10 +10,10 @@ use simple_logger::SimpleLogger;
 use clap::{ArgGroup, Parser};
 
 // Allocator
-use mimalloc::MiMalloc;
+//use mimalloc::MiMalloc;
 
-#[global_allocator]
-static GLOBAL: MiMalloc = MiMalloc;
+//#[global_allocator]
+//static GLOBAL: MiMalloc = MiMalloc;
 
 // The main config
 #[derive(Debug, Parser)]
