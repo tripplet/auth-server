@@ -84,7 +84,8 @@ pub async fn run_server(cfg: &Config) {
             .service(check)
             .service(generate)
     })
-    .workers(1);
+    .workers(1)
+    .keep_alive(std::time::Duration::from_secs(5));
 
     match &cfg.listen {
         #[cfg(feature = "systemd_socket_activation")]
@@ -123,7 +124,7 @@ pub async fn run_server(cfg: &Config) {
                 }
 
                 // Cleanup socket file
-                let _ = std::fs::remove_file(&path);
+                let _ = std::fs::remove_file(path);
             }
         }
         listen::Socket::Address(addr) => {

@@ -1,6 +1,6 @@
 use std::net::SocketAddr;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Socket {
     File(String),
     Address(SocketAddr),
