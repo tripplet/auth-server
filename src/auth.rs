@@ -59,7 +59,7 @@ pub fn check_token(token: &str, sub: &str, key: &str) -> Result<Claims, Box<dyn 
 mod tests {
     use super::*;
 
-    use base64;
+    use base64::{Engine as _, engine::general_purpose};
 
     #[test]
     fn generate_token() {
@@ -76,12 +76,11 @@ mod tests {
 
         assert_eq!(
             [
-                base64::encode(r#"{"typ":"JWT","alg":"HS256"}"#),
-                base64::encode(format!(
+                general_purpose::STANDARD_NO_PAD.encode(r#"{"typ":"JWT","alg":"HS256"}"#),
+                general_purpose::STANDARD_NO_PAD.encode(format!(
                     r#"{{"sub":"{}","exp":{}}}"#,
                     param.sub, param.duration
                 ))
-                .trim_end_matches("=")
                 .to_owned(),
                 "6cTcqIk7IHq_J_qmOsbQcXOLjAZMPqIlJUAOyEgVDhk".to_owned()
             ]
