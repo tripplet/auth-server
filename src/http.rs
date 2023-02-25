@@ -3,8 +3,7 @@ use crate::http;
 use crate::listen;
 use crate::Config;
 
-use std::error::Error;
-use std::process;
+use std::{error::Error, fs, process};
 
 use actix_web::cookie::{Cookie, SameSite};
 use actix_web::middleware::{Condition, Logger};
@@ -64,11 +63,23 @@ pub async fn run_server(cfg: &Config) {
     let secret_key = if let Some(secret) = &cfg.secret {
         secret.clone()
     } else if let Some(secret_file) = &cfg.secret_file {
-        secret_file.clone()
+        match fs::read_to_string(secret_file) {
+            Ok(secret) => secret,
+            Err(err) => {
+                error!("Unable to read secret file: {err}");
+                process::exit(-1);
+            }
+        }
     } else {
         error!("No secret defined");
         process::exit(-1);
     };
+
+    // Basic sanity check
+    if secret_key.len() < 16 {
+        error!("The secret key is too short and should be at least 16 characters long");
+        process::exit(-1);
+    }
 
     // Avoid capturing cfg
     let cookie_name = cfg.cookie_name.clone();
