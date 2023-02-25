@@ -3,6 +3,7 @@ use crate::http;
 use crate::listen;
 use crate::Config;
 
+use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
 use std::{error::Error, fs, process};
 
 use actix_web::cookie::{Cookie, SameSite};
@@ -16,6 +17,7 @@ use tokio::{select, signal};
 struct AppState {
     cookie_name: String,
     secret_key: String,
+    request_received: Arc<AtomicBool>,
 }
 
 #[get("/check/{sub}")]
@@ -24,6 +26,8 @@ async fn check(
     path: web::Path<String>,
     data: web::Data<AppState>,
 ) -> impl Responder {
+    data.request_received.store(true, Ordering::Relaxed);
+
     match req.cookie(&data.cookie_name) {
         None => HttpResponse::Unauthorized(),
         Some(cookie) => {
@@ -40,6 +44,8 @@ async fn generate(
     param: web::Query<auth::AuthParameter>,
     data: web::Data<AppState>,
 ) -> impl Responder {
+    data.request_received.store(true, Ordering::Relaxed);
+
     let duration = Duration::seconds(param.duration as i64);
     let cookie = http::generate_cookie(&data.cookie_name, &param, &data.secret_key).unwrap();
 
@@ -85,12 +91,17 @@ pub async fn run_server(cfg: &Config) {
     let cookie_name = cfg.cookie_name.clone();
     let verbose = cfg.verbose;
 
+    // Create boolean handle idle timeout
+    let request_received = Arc::new(AtomicBool::new(false));
+    let request_received_setter = request_received.clone();
+
     let server = HttpServer::new(move || {
         App::new()
             .wrap(Condition::new(verbose, Logger::default()))
             .app_data(web::Data::new(AppState {
                 cookie_name: cookie_name.to_string(),
                 secret_key: secret_key.to_string(),
+                request_received: request_received_setter.clone(),
             }))
             .service(check)
             .service(generate)
@@ -101,6 +112,8 @@ pub async fn run_server(cfg: &Config) {
     match &cfg.listen {
         #[cfg(feature = "systemd_socket_activation")]
         listen::Socket::Systemd => {
+            use std::{future::Future, pin::Pin};
+
             let incoming = match socket_from_systemd_activation() {
                 Ok(Some(socket)) => socket,
                 Ok(None) => {
@@ -113,9 +126,52 @@ pub async fn run_server(cfg: &Config) {
                 }
             };
 
+            let mut tasks: Vec<Pin<Box<dyn Future<Output = Result<(), &str>>>>> = vec![];
+
+            // Add the http server to the task list
+            tasks.push(Box::pin(async move {
+                _ = server.listen_uds(incoming).unwrap().run().await;
+                Ok(())
+            }));
+
+            // Add the Ctrl+C handler to the task list
+            tasks.push(Box::pin(async move {
+                _ = signal::ctrl_c().await;
+                Ok(())
+            }));
+
+            // If a idle timeout is set, create a new timeout task and add it to the task list
+            if let Some(idle_time) = cfg.systemd_activation_idle {
+                if idle_time > 0 {
+                    let timeout = tokio::time::Duration::from_secs(idle_time as u64);
+                    let request_received_check = request_received.clone();
+
+                    let idle_timeout = tokio::task::spawn(async move {
+                        loop {
+                            tokio::time::sleep(timeout).await;
+
+                            // If the request_received has not been set to true in the timeout period => exit
+                            if request_received_check.compare_exchange(
+                                true, false, Ordering::Acquire, Ordering::Relaxed).is_err()
+                            {
+                                break;
+                            }
+                        }
+                    });
+
+                    tasks.push(Box::pin(async move {
+                        _ = idle_timeout.await;
+                        Err("Idle timeout")
+                    }));
+                }
+            }
+
             select! {
-                _ = server.listen_uds(incoming).unwrap().run() => (),
-                _ = signal::ctrl_c() => (),
+                result = futures::future::select_all(tasks) =>
+                    match result {
+                        (Err(err), ..) => error!("Closing server: {err}"),
+                        _ => (),
+                    }
             }
         }
         listen::Socket::File(path) => {
@@ -134,7 +190,7 @@ pub async fn run_server(cfg: &Config) {
                     _ = signal::ctrl_c() => (),
                 }
 
-                // Cleanup socket file
+                // Try to cleanup socket file
                 let _ = std::fs::remove_file(path);
             }
         }

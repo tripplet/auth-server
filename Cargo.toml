@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 actix-web = { version = "4", default-features = false, features = [ "macros", "cookies" ] }
 tokio = { version = "1", features = [ "macros" ] }
+futures = { version = "0.3", optional = true }
 log = "0.4"
 simple_logger = { version = "4.0", default-features = false }
 serde = "1.0"
@@ -21,7 +22,7 @@ clap = { version = "4.0", features = ["derive", "env"] }
 base64 = "0.21"
 
 [features]
-systemd_socket_activation = ["libsystemd"]
+systemd_socket_activation = ["libsystemd", "futures"]
 
 [target.'cfg(unix)'.dependencies]
 nix = "^0.26"

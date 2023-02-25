@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+/// The different options for listening
 #[derive(Debug, Clone, PartialEq)]
 pub enum Socket {
     File(String),

@@ -24,22 +24,22 @@ pub struct Config {
     #[clap(long, env, default_value = "127.0.0.1:14314")]
     listen: listen::Socket,
 
-    /// Timeout after which the programs waits for new requests afterwards it exists (used for
-    /// systemd socket activation
-    #[cfg(feature = "systemd_socket_activation")]
-    #[clap(long, env, default_value = "30")]
-    systemd_activation_idle: u16,
+    /// Timeout after which the programs waits for new requests afterwards it exists
+    /// (used for systemd socket activation)
+    //#[cfg(feature = "systemd_socket_activation")]
+    #[clap(long, env)]
+    systemd_activation_idle: Option<u16>,
 
     /// Set the group of the unix socket file to the given group
     #[clap(long, env)]
     socket_group: Option<String>,
 
-    /// Secret secret to use
+    /// Secret to use
     #[clap(long, env, group = "secrets", hide_env_values = true)]
     secret: Option<String>,
 
     /// Read secret from file
-    #[clap(long, env, group = "secrets", hide_env_values = true)]
+    #[clap(long, env, group = "secrets")]
     secret_file: Option<String>,
 
     /// The name of the cookie
