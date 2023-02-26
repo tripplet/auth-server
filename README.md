@@ -9,9 +9,11 @@ Usage: auth-server [OPTIONS] <--secret <SECRET>|--secret-file <SECRET_FILE>>
 
 Options:
       --listen <LISTEN>
-          Address to listen on like 127.0.0.1:14314, can also be a unix socket (e.g. unix:/tmp/auth-server.sock) [env: LISTEN=] [default: 127.0.0.1:14314]
+          Address to listen on like 127.0.0.1:14314, can also be a unix socket 
+          (e.g. unix:/tmp/auth-server.sock) [env: LISTEN=] [default: 127.0.0.1:14314]
       --systemd-activation-idle <SYSTEMD_ACTIVATION_IDLE>
-          Timeout after which the programs waits for new requests afterwards it exists (used for systemd socket activation) [env: SYSTEMD_ACTIVATION_IDLE=]
+          Timeout after which the programs waits for new requests afterwards it exists 
+          (used for systemd socket activation) [env: SYSTEMD_ACTIVATION_IDLE=]
       --socket-group <SOCKET_GROUP>
           Set the group of the unix socket file to the given group [env: SOCKET_GROUP=]
       --secret <SECRET>
