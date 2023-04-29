@@ -8,7 +8,6 @@ edition = "2021"
 [dependencies]
 actix-web = { version = "4", default-features = false, features = [ "macros", "cookies" ] }
 tokio = { version = "1", features = [ "macros" ] }
-futures = { version = "0.3", optional = true }
 log = "0.4"
 simple_logger = { version = "4.0", default-features = false }
 serde = "1.0"
@@ -29,6 +28,7 @@ nix = "0.26"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libsystemd = { version = "0.6", optional = true }
+futures = { version = "0.3", optional = true }
 
 [profile.release]
 #debug = true

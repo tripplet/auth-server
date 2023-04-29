@@ -152,7 +152,7 @@ pub async fn run_server(cfg: &Config) {
 
                             // If the request_received has not been set to true in the timeout period => exit
                             if request_received_check.compare_exchange(
-                                true, false, Ordering::Acquire, Ordering::Relaxed).is_err()
+                                true, false, Ordering::Relaxed, Ordering::Relaxed).is_err()
                             {
                                 break;
                             }
