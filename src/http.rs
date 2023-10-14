@@ -66,26 +66,10 @@ async fn generate(
 }
 
 pub async fn run_server(cfg: &Config) {
-    let secret_key = if let Some(secret) = &cfg.secret {
-        secret.clone()
-    } else if let Some(secret_file) = &cfg.secret_file {
-        match fs::read_to_string(secret_file) {
-            Ok(secret) => secret,
-            Err(err) => {
-                error!("Unable to read secret file: {err}");
-                process::exit(-1);
-            }
-        }
-    } else {
-        error!("No secret defined");
-        process::exit(-1);
+    let secret_key = match load_secret_key(cfg) {
+        Err(_) => process::exit(-1),
+        Ok(key) => key,
     };
-
-    // Basic sanity check
-    if secret_key.len() < 16 {
-        error!("The secret key is too short and should be at least 16 characters long");
-        process::exit(-1);
-    }
 
     // Avoid capturing cfg
     let cookie_name = cfg.cookie_name.clone();
@@ -151,8 +135,9 @@ pub async fn run_server(cfg: &Config) {
                             tokio::time::sleep(timeout).await;
 
                             // If the request_received has not been set to true in the timeout period => exit
-                            if request_received_check.compare_exchange(
-                                true, false, Ordering::Relaxed, Ordering::Relaxed).is_err()
+                            if request_received_check
+                                .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
+                                .is_err()
                             {
                                 break;
                             }
@@ -203,6 +188,38 @@ pub async fn run_server(cfg: &Config) {
             }
         }
     }
+}
+
+#[cfg_attr(test, derive(Debug))]
+enum KeyError {
+    NoKeyFound,
+    UnableToReadKeyFile(std::io::Error),
+    KeyToShort,
+}
+
+fn load_secret_key(cfg: &Config) -> Result<String, KeyError> {
+    let secret_key = if let Some(secret) = &cfg.secret {
+        Ok(secret.clone())
+    } else if let Some(secret_file) = &cfg.secret_file {
+        match fs::read_to_string(secret_file) {
+            Ok(secret) => Ok(secret),
+            Err(err) => {
+                error!("Unable to read secret file: {err}");
+                Err(KeyError::UnableToReadKeyFile(err))
+            }
+        }
+    } else {
+        error!("No secret defined");
+        Err(KeyError::NoKeyFound)
+    };
+
+    // Basic sanity check
+    if secret_key.as_ref().is_ok_and(|k| k.len() < 16) {
+        error!("The secret key is too short and should be at least 16 characters long");
+        return Err(KeyError::KeyToShort);
+    }
+
+    secret_key
 }
 
 /// Generate a cookie with the given authorization
@@ -265,5 +282,83 @@ pub fn socket_from_systemd_activation(
         unsafe { Ok(Some(UnixListener::from_raw_fd(fds.remove(0).into_raw_fd()))) }
     } else {
         Err("Not supported".into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::*;
+
+    impl Default for Config {
+        fn default() -> Self {
+            Self {
+                listen: "0.0.0.0:1234".parse().unwrap(),
+                systemd_activation_idle: Default::default(),
+                socket_group: Default::default(),
+                secret: Default::default(),
+                secret_file: Default::default(),
+                cookie_name: Default::default(),
+                verbose: Default::default(),
+            }
+        }
+    }
+
+    impl PartialEq for KeyError {
+        fn eq(&self, other: &Self) -> bool {
+            match (self, other) {
+                (Self::UnableToReadKeyFile(l0), Self::UnableToReadKeyFile(r0)) => true,
+                (Self::KeyToShort, Self::KeyToShort) => true,
+                (Self::NoKeyFound, Self::NoKeyFound) => true,
+                _ => false,
+            }
+        }
+    }
+
+    #[test]
+    fn test_key_to_short_cli() {
+        let cfg = Config {
+            secret: Some("test".into()),
+            ..Default::default()
+        };
+
+        assert_eq!(load_secret_key(&cfg), Err(KeyError::KeyToShort));
+    }
+
+    #[test]
+    fn test_key_to_short_file() {
+        let mut tempfile = tempfile::NamedTempFile::new().unwrap();
+        write!(tempfile, "secret123").unwrap();
+
+        let cfg = Config {
+            secret_file: Some(tempfile.path().to_str().unwrap().into()),
+            ..Default::default()
+        };
+
+        assert_eq!(load_secret_key(&cfg), Err(KeyError::KeyToShort));
+    }
+
+    #[test]
+    fn test_key_cli() {
+        let cfg = Config {
+            secret: Some("1234567890123456".into()),
+            ..Default::default()
+        };
+
+        assert_eq!(load_secret_key(&cfg), Ok("1234567890123456".into()));
+    }
+
+    #[test]
+    fn test_key_from_file() {
+        let mut tempfile = tempfile::NamedTempFile::new().unwrap();
+        write!(tempfile, "1234567890123456").unwrap();
+
+        let cfg = Config {
+            secret_file: Some(tempfile.path().to_str().unwrap().into()),
+            ..Default::default()
+        };
+
+        assert_eq!(load_secret_key(&cfg), Ok("1234567890123456".into()));
     }
 }

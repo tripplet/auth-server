@@ -6,7 +6,7 @@ mod listen;
 use log::LevelFilter;
 use simple_logger::SimpleLogger;
 
-// Commandline parsing
+// Command line parsing
 use clap::{ArgGroup, Parser};
 
 // Allocator

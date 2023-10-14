@@ -30,3 +30,34 @@ impl std::str::FromStr for Socket {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::net::{Ipv4Addr, Ipv6Addr, SocketAddrV4, SocketAddrV6};
+
+    use super::*;
+
+    #[test]
+    fn test_parse_v4() {
+        assert_eq!(
+            "0.0.0.0:1234".parse::<Socket>().unwrap(),
+            Socket::Address(SocketAddr::V4(SocketAddrV4::new(
+                Ipv4Addr::UNSPECIFIED,
+                1234
+            )))
+        );
+    }
+
+    #[test]
+    fn test_parse_v6() {
+        assert_eq!(
+            "[::]:1234".parse::<Socket>().unwrap(),
+            Socket::Address(SocketAddr::V6(SocketAddrV6::new(
+                Ipv6Addr::UNSPECIFIED,
+                1234,
+                0,
+                0
+            )))
+        );
+    }
+}
