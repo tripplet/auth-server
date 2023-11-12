@@ -41,7 +41,7 @@ async fn check(
 
 #[get("/generate")]
 async fn generate(
-    param: web::Query<auth::AuthParameter>,
+    web::Query(param): web::Query<auth::AuthParameter>,
     data: web::Data<AppState>,
 ) -> impl Responder {
     data.request_received.store(true, Ordering::Relaxed);
@@ -308,7 +308,7 @@ mod tests {
     impl PartialEq for KeyError {
         fn eq(&self, other: &Self) -> bool {
             match (self, other) {
-                (Self::UnableToReadKeyFile(l0), Self::UnableToReadKeyFile(r0)) => true,
+                (Self::UnableToReadKeyFile(_), Self::UnableToReadKeyFile(_)) => true,
                 (Self::KeyToShort, Self::KeyToShort) => true,
                 (Self::NoKeyFound, Self::NoKeyFound) => true,
                 _ => false,

@@ -58,8 +58,55 @@ pub fn check_token(token: &str, sub: &str, key: &str) -> Result<Claims, Box<dyn 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use base64::{engine::general_purpose, Engine as _};
+
+    #[test]
+    fn generate_token_now() {
+        let key = "secretkey";
+        let param = AuthParameter {
+            domain: "unused-here".to_string(),
+            duration: 4242,
+            sub: "service1".to_string(),
+        };
+
+        let token = param.generate_token(key).unwrap();
+        let parts: Vec<_> = token.split('.').collect();
+
+        assert_eq!(parts.len(), 3);
+
+        assert_eq!(
+            general_purpose::STANDARD_NO_PAD.encode(r#"{"typ":"JWT","alg":"HS256"}"#),
+            parts[0]
+        );
+
+        let part1: serde_json::Value =
+            serde_json::from_slice(&general_purpose::STANDARD_NO_PAD.decode(parts[1]).unwrap())
+                .unwrap();
+
+        assert_eq!(
+            part1
+                .as_object()
+                .unwrap()
+                .get("sub")
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            param.sub
+        );
+
+        let exp = part1
+            .as_object()
+            .unwrap()
+            .get("exp")
+            .unwrap()
+            .as_i64()
+            .unwrap();
+        let exp_truth = (time::OffsetDateTime::now_utc()
+            + Duration::seconds(param.duration as i64))
+        .unix_timestamp();
+
+        assert!((exp_truth..exp_truth + 10).contains(&exp));
+    }
 
     #[test]
     fn generate_token() {
