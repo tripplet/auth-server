@@ -1,5 +1,5 @@
 pkgname=auth-server
-pkgver=1.3.2
+pkgver=1.3.3
 pkgrel=1
 pkgdesc='Service for authenticating requests from nginx (ngx_http_auth_request_module).'
 url="https://github.com/tripplet/auth-server"
