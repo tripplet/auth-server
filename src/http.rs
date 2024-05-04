@@ -41,7 +41,7 @@ async fn check(
 
 #[get("/generate")]
 async fn generate(
-    web::Query(param): web::Query<auth::AuthParameter>,
+    web::Query(param): web::Query<auth::Parameter>,
     data: web::Data<AppState>,
 ) -> impl Responder {
     data.request_received.store(true, Ordering::Relaxed);
@@ -191,6 +191,7 @@ pub async fn run_server(cfg: &Config) {
 }
 
 #[cfg_attr(test, derive(Debug))]
+#[allow(dead_code)]
 enum KeyError {
     NoKeyFound,
     UnableToReadKeyFile(std::io::Error),
@@ -225,7 +226,7 @@ fn load_secret_key(cfg: &Config) -> Result<String, KeyError> {
 /// Generate a cookie with the given authorization
 fn generate_cookie(
     name: &str,
-    param: &auth::AuthParameter,
+    param: &auth::Parameter,
     key: &str,
 ) -> Result<String, Box<dyn Error>> {
     Ok(Cookie::build(name, param.generate_token(key)?)

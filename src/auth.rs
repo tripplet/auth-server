@@ -11,13 +11,13 @@ pub struct Claims {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct AuthParameter {
+pub struct Parameter {
     pub domain: String,
     pub duration: u64,
     pub sub: String,
 }
 
-impl AuthParameter {
+impl Parameter {
     /// Generate an authorization token
     pub fn generate_token(&self, key: &str) -> Result<String, jsonwebtoken::errors::Error> {
         self.generate_token_at_moment(key, time::OffsetDateTime::now_utc())
@@ -63,7 +63,7 @@ mod tests {
     #[test]
     fn generate_token_now() {
         let key = "secretkey";
-        let param = AuthParameter {
+        let param = Parameter {
             domain: "unused-here".to_string(),
             duration: 4242,
             sub: "service1".to_string(),
@@ -111,7 +111,7 @@ mod tests {
     #[test]
     fn generate_token() {
         let key = "secretkey";
-        let param = AuthParameter {
+        let param = Parameter {
             domain: "unused-here".to_string(),
             duration: 4242,
             sub: "service1".to_string(),
@@ -140,7 +140,7 @@ mod tests {
     #[test]
     fn check_expired_token() {
         let key = "secretkey";
-        let param = AuthParameter {
+        let param = Parameter {
             domain: "unused-here".to_string(),
             duration: 4242,
             sub: "service1".to_string(),
@@ -165,7 +165,7 @@ mod tests {
     #[test]
     fn check_valid_token() {
         let key = "secretkey";
-        let param = AuthParameter {
+        let param = Parameter {
             domain: "unused-here".to_string(),
             duration: 60 * 60 * 24 * 365 * 1000, // valid for ~1000 years should be enough
             sub: "service1".to_string(),
@@ -181,7 +181,7 @@ mod tests {
     #[test]
     fn check_invalid_token() {
         let key = "secretkey";
-        let param = AuthParameter {
+        let param = Parameter {
             domain: "unused-here".to_string(),
             duration: 60 * 60 * 24 * 365 * 1000, // valid for ~1000 years should be enough
             sub: "service1".to_string(),
@@ -225,7 +225,7 @@ mod tests {
     #[test]
     fn changed_sub_should_be_invalid() {
         let key = "secretkey";
-        let param = AuthParameter {
+        let param = Parameter {
             domain: "unused-here".to_string(),
             duration: 60 * 60 * 24 * 365 * 1000, // valid for ~1000 years should be enough
             sub: "service1".to_string(),

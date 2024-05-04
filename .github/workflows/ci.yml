@@ -18,5 +18,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Build
         run: cargo build --release --locked --all-features
+      - name: Clippy
+        run: cargo clippy
       - name: Run Tests
         run: cargo test --release
