@@ -4,15 +4,17 @@ use crate::listen;
 use crate::Config;
 
 use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
-use std::{error::Error, fs, process};
+use std::{error::Error, fmt, fs, process};
 
 use actix_web::cookie::{Cookie, SameSite};
 use actix_web::middleware::{Condition, Logger};
 use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
 
 use log::error;
-use time::{macros::format_description, Duration};
+use time::macros::format_description;
 use tokio::{select, signal};
+
+use crate::auth::seconds_saturating;
 
 struct AppState {
     cookie_name: String,
@@ -31,9 +33,10 @@ async fn check(
     match req.cookie(&data.cookie_name) {
         None => HttpResponse::Unauthorized(),
         Some(cookie) => {
-            match auth::check_token(cookie.value(), &path.into_inner(), &data.secret_key).is_ok() {
-                false => HttpResponse::Unauthorized(),
-                true => HttpResponse::Ok(),
+            if auth::check_token(cookie.value(), &path.into_inner(), &data.secret_key).is_ok() {
+                HttpResponse::Ok()
+            } else {
+                HttpResponse::Unauthorized()
             }
         }
     }
@@ -46,7 +49,7 @@ async fn generate(
 ) -> impl Responder {
     data.request_received.store(true, Ordering::Relaxed);
 
-    let duration = Duration::seconds(param.duration as i64);
+    let duration = seconds_saturating(param.duration);
     let cookie = http::generate_cookie(&data.cookie_name, &param, &data.secret_key).unwrap();
 
     let valid_until = (time::OffsetDateTime::now_utc() + duration).format(format_description!(
@@ -67,7 +70,10 @@ async fn generate(
 
 pub async fn run_server(cfg: &Config) {
     let secret_key = match load_secret_key(cfg) {
-        Err(_) => process::exit(-1),
+        Err(err) => {
+            error!("{}", err);
+            process::exit(-1);
+        }
         Ok(key) => key,
     };
 
@@ -159,6 +165,7 @@ pub async fn run_server(cfg: &Config) {
                     }
             }
         }
+
         listen::Socket::File(path) => {
             if cfg!(windows) {
                 _ = path;
@@ -190,13 +197,27 @@ pub async fn run_server(cfg: &Config) {
     }
 }
 
-#[cfg_attr(test, derive(Debug))]
-#[allow(dead_code)]
+#[derive(Debug)]
 enum KeyError {
     NoKeyFound,
-    UnableToReadKeyFile(std::io::Error),
     KeyToShort,
+    UnableToReadKeyFile(std::io::Error),
 }
+
+impl fmt::Display for KeyError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            Self::NoKeyFound => write!(f, "No secret defined"),
+            Self::KeyToShort => write!(
+                f,
+                "The secret key is too short and should be at least 16 characters long"
+            ),
+            Self::UnableToReadKeyFile(err) => write!(f, "Unable to read secret file: {err}"),
+        }
+    }
+}
+
+impl Error for KeyError {}
 
 fn load_secret_key(cfg: &Config) -> Result<String, KeyError> {
     let secret_key = if let Some(secret) = &cfg.secret {
@@ -204,19 +225,14 @@ fn load_secret_key(cfg: &Config) -> Result<String, KeyError> {
     } else if let Some(secret_file) = &cfg.secret_file {
         match fs::read_to_string(secret_file) {
             Ok(secret) => Ok(secret),
-            Err(err) => {
-                error!("Unable to read secret file: {err}");
-                Err(KeyError::UnableToReadKeyFile(err))
-            }
+            Err(err) => Err(KeyError::UnableToReadKeyFile(err)),
         }
     } else {
-        error!("No secret defined");
         Err(KeyError::NoKeyFound)
     };
 
     // Basic sanity check
     if secret_key.as_ref().is_ok_and(|k| k.len() < 16) {
-        error!("The secret key is too short and should be at least 16 characters long");
         return Err(KeyError::KeyToShort);
     }
 
@@ -235,7 +251,7 @@ fn generate_cookie(
         .secure(true)
         .http_only(true)
         .same_site(SameSite::Strict)
-        .max_age(Duration::seconds(param.duration as i64))
+        .max_age(seconds_saturating(param.duration))
         .finish()
         .to_string())
 }

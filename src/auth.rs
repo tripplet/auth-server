@@ -26,11 +26,11 @@ impl Parameter {
     fn generate_token_at_moment(
         &self,
         key: &str,
-        now: time::OffsetDateTime,
+        moment: time::OffsetDateTime,
     ) -> Result<String, jsonwebtoken::errors::Error> {
         let claims = Claims {
             sub: self.sub.clone(),
-            exp: (now + Duration::seconds(self.duration as i64)).unix_timestamp(),
+            exp: (moment + seconds_saturating(self.duration)).unix_timestamp(),
         };
 
         encode(
@@ -53,6 +53,10 @@ pub fn check_token(token: &str, sub: &str, key: &str) -> Result<Claims, Box<dyn 
         &jwt_validation,
     )?
     .claims)
+}
+
+pub fn seconds_saturating(duration: u64) -> Duration {
+    Duration::seconds(i64::try_from(duration).unwrap_or(i64::MAX))
 }
 
 #[cfg(test)]
@@ -101,9 +105,8 @@ mod tests {
             .unwrap()
             .as_i64()
             .unwrap();
-        let exp_truth = (time::OffsetDateTime::now_utc()
-            + Duration::seconds(param.duration as i64))
-        .unix_timestamp();
+        let exp_truth =
+            (time::OffsetDateTime::now_utc() + seconds_saturating(param.duration)).unix_timestamp();
 
         assert!((exp_truth..exp_truth + 10).contains(&exp));
     }
