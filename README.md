@@ -1,5 +1,5 @@
 # Auth-Server
-![CI](https://github.com/tripplet/auth-server/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/tripplet/auth-server/actions/workflows/ci.yml/badge.svg)](https://github.com/tripplet/auth-server/actions/workflows/ci.yml)
 
 Simple authentication server for the [nginx auth request module](http://nginx.org/en/docs/http/ngx_http_auth_request_module.html)
 
