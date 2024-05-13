@@ -95,7 +95,10 @@ mod tests {
         fn default() -> Self {
             Self {
                 listen: "0.0.0.0:1234".parse().unwrap(),
+
+                #[cfg(feature = "systemd_socket_activation")]
                 systemd_activation_idle: Default::default(),
+
                 socket_group: Default::default(),
                 secret: Default::default(),
                 secret_file: Default::default(),

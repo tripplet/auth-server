@@ -1,6 +1,6 @@
 [package]
 name = "auth-server"
-version = "1.3.7"
+version = "1.3.8"
 authors = ["Tobias Tangemann <tobias@tangemann.org>"]
 description = "Service for authenticating requests from nginx (ngx_http_auth_request_module)."
 edition = "2021"
