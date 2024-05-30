@@ -101,70 +101,7 @@ pub async fn run_server(cfg: &Config) {
 
     match &cfg.listen {
         #[cfg(feature = "systemd_socket_activation")]
-        listen::Socket::Systemd => {
-            use std::{future::Future, pin::Pin};
-
-            let incoming = match socket_from_systemd_activation() {
-                Ok(Some(socket)) => socket,
-                Ok(None) => {
-                    error!("No systemd socket activation provided");
-                    process::exit(-2);
-                }
-                Err(err) => {
-                    error!("Error determining socket activation: {err}");
-                    process::exit(-3);
-                }
-            };
-
-            let mut tasks: Vec<Pin<Box<dyn Future<Output = Result<(), &str>>>>> = vec![];
-
-            // Add the http server to the task list
-            tasks.push(Box::pin(async move {
-                _ = server.listen_uds(incoming).unwrap().run().await;
-                Ok(())
-            }));
-
-            // Add the Ctrl+C handler to the task list
-            tasks.push(Box::pin(async move {
-                _ = signal::ctrl_c().await;
-                Ok(())
-            }));
-
-            // If a idle timeout is set, create a new timeout task and add it to the task list
-            if let Some(idle_time) = cfg.systemd_activation_idle {
-                if idle_time > 0 {
-                    let timeout = tokio::time::Duration::from_secs(idle_time as u64);
-                    let request_received_check = request_received.clone();
-
-                    let idle_timeout = tokio::task::spawn(async move {
-                        loop {
-                            tokio::time::sleep(timeout).await;
-
-                            // If the request_received has not been set to true in the timeout period => exit
-                            if request_received_check
-                                .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
-                                .is_err()
-                            {
-                                break;
-                            }
-                        }
-                    });
-
-                    tasks.push(Box::pin(async move {
-                        _ = idle_timeout.await;
-                        Err("Idle timeout")
-                    }));
-                }
-            }
-
-            select! {
-                result = futures::future::select_all(tasks) =>
-                    match result {
-                        (Err(err), ..) => error!("Closing server: {err}"),
-                        _ => (),
-                    }
-            }
-        }
+        listen::Socket::Systemd => handle_systemd_activation(),
 
         listen::Socket::File(path) => {
             if cfg!(windows) {
@@ -299,6 +236,72 @@ pub fn socket_from_systemd_activation(
         unsafe { Ok(Some(UnixListener::from_raw_fd(fds.remove(0).into_raw_fd()))) }
     } else {
         Err("Not supported".into())
+    }
+}
+
+#[cfg(feature = "systemd_socket_activation")]
+fn handle_systemd_activation() {
+    use std::{future::Future, pin::Pin};
+
+    let incoming = match socket_from_systemd_activation() {
+        Ok(Some(socket)) => socket,
+        Ok(None) => {
+            error!("No systemd socket activation provided");
+            process::exit(-2);
+        }
+        Err(err) => {
+            error!("Error determining socket activation: {err}");
+            process::exit(-3);
+        }
+    };
+
+    let mut tasks: Vec<Pin<Box<dyn Future<Output = Result<(), &str>>>>> = vec![];
+
+    // Add the http server to the task list
+    tasks.push(Box::pin(async move {
+        _ = server.listen_uds(incoming).unwrap().run().await;
+        Ok(())
+    }));
+
+    // Add the Ctrl+C handler to the task list
+    tasks.push(Box::pin(async move {
+        _ = signal::ctrl_c().await;
+        Ok(())
+    }));
+
+    // If a idle timeout is set, create a new timeout task and add it to the task list
+    if let Some(idle_time) = cfg.systemd_activation_idle {
+        if idle_time > 0 {
+            let timeout = tokio::time::Duration::from_secs(idle_time as u64);
+            let request_received_check = request_received.clone();
+
+            let idle_timeout = tokio::task::spawn(async move {
+                loop {
+                    tokio::time::sleep(timeout).await;
+
+                    // If the request_received has not been set to true in the timeout period => exit
+                    if request_received_check
+                        .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+            });
+
+            tasks.push(Box::pin(async move {
+                _ = idle_timeout.await;
+                Err("Idle timeout")
+            }));
+        }
+    }
+
+    select! {
+        result = futures::future::select_all(tasks) =>
+            match result {
+                (Err(err), ..) => error!("Closing server: {err}"),
+                _ => (),
+            }
     }
 }
 
