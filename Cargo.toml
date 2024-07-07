@@ -7,19 +7,19 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-actix-web = { version = "4.6.0", default-features = false, features = ["macros", "cookies"] }
-clap = { version = "4.5.4", features = ["derive", "env"] }
+actix-web = { version = "4.8.0", default-features = false, features = ["macros", "cookies"] }
+clap = { version = "4.5.8", features = ["derive", "env"] }
 cookie = "0.18.1"
 jsonwebtoken = { version = "9.3.0", default-features = false }
-log = "0.4.21"
-serde = "1.0.203"
+log = "0.4.22"
+serde = "1.0.204"
 simple_logger = { version = "5.0.0", default-features = false }
 time = { version = "0.3.36", features = ["formatting"] } # must match dependency in cookie
 tokio = { version = "1.38.0", features = ["macros"] }
 
 [dev-dependencies]
 base64 = "0.22.1"
-serde_json = "1.0.117"
+serde_json = "1.0.120"
 tempfile = "3.10.1"
 
 [features]
