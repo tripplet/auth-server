@@ -103,6 +103,7 @@ pub async fn run_server(cfg: &Config) {
         #[cfg(feature = "systemd_socket_activation")]
         listen::Socket::Systemd => {
             use std::{future::Future, pin::Pin};
+            type Tasks = Pin<Box<dyn Future<Output = Result<(), &'static str>>>>;
 
             let incoming = match socket_from_systemd_activation() {
                 Ok(Some(socket)) => socket,
@@ -116,7 +117,7 @@ pub async fn run_server(cfg: &Config) {
                 }
             };
 
-            let mut tasks: Vec<Pin<Box<dyn Future<Output = Result<(), &str>>>>> = vec![];
+            let mut tasks: Vec<Tasks> = vec![];
 
             // Add the http server to the task list
             tasks.push(Box::pin(async move {
@@ -133,36 +134,16 @@ pub async fn run_server(cfg: &Config) {
             // If a idle timeout is set, create a new timeout task and add it to the task list
             if let Some(idle_time) = cfg.systemd_activation_idle {
                 if idle_time > 0 {
-                    let timeout = tokio::time::Duration::from_secs(idle_time as u64);
-                    let request_received_check = request_received.clone();
-
-                    let idle_timeout = tokio::task::spawn(async move {
-                        loop {
-                            tokio::time::sleep(timeout).await;
-
-                            // If the request_received has not been set to true in the timeout period => exit
-                            if request_received_check
-                                .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
-                                .is_err()
-                            {
-                                break;
-                            }
-                        }
-                    });
-
-                    tasks.push(Box::pin(async move {
-                        _ = idle_timeout.await;
-                        Err("Idle timeout")
-                    }));
+                    tasks.push(create_idle_timeout_task(
+                        request_received.clone(),
+                        tokio::time::Duration::from_secs(u64::from(idle_time)),
+                    ));
                 }
             }
 
             select! {
                 result = futures::future::select_all(tasks) =>
-                    match result {
-                        (Err(err), ..) => error!("Closing server: {err}"),
-                        _ => (),
-                    }
+                    if let (Err(err), ..) = result { error!("Closing server: {err}") }
             }
         }
 
@@ -258,4 +239,29 @@ pub fn socket_from_systemd_activation(
     } else {
         Err("Not supported".into())
     }
+}
+
+#[cfg(feature = "systemd_socket_activation")]
+fn create_idle_timeout_task(
+    activity: Arc<AtomicBool>,
+    idle_timeout: tokio::time::Duration,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<(), &'static str>>>> {
+    let timeout_task = tokio::task::spawn(async move {
+        loop {
+            tokio::time::sleep(idle_timeout).await;
+
+            // If the request_received has not been set to true in the timeout period => exit
+            if activity
+                .compare_exchange(true, false, Ordering::Relaxed, Ordering::Relaxed)
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+
+    Box::pin(async move {
+        _ = timeout_task.await;
+        Err("Idle timeout")
+    })
 }

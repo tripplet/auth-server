@@ -9,7 +9,7 @@ use crate::listen;
 #[clap(version)]
 #[clap(group(ArgGroup::new("secrets").required(true)))]
 pub struct Config {
-    /// Address to listen on like 127.0.0.1:14314, can also be a unix socket (e.g. unix:/tmp/auth-server.sock)
+    /// Address to listen on like 127.0.0.1:14314, can also be a unix socket (e.g. `unix:/tmp/auth-server.sock`)
     #[clap(long, env, default_value = "127.0.0.1:14314")]
     pub listen: listen::Socket,
 
