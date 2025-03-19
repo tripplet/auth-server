@@ -7,20 +7,20 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-actix-web = { version = "4.8.0", default-features = false, features = ["macros", "cookies"] }
-clap = { version = "4.5.8", features = ["derive", "env"] }
+actix-web = { version = "4.10.2", default-features = false, features = ["macros", "cookies"] }
+clap = { version = "4.5.32", features = ["derive", "env"] }
 cookie = "0.18.1"
-jsonwebtoken = { version = "9.3.0", default-features = false }
-log = "0.4.22"
-serde = "1.0.204"
+jsonwebtoken = { version = "9.3.1", default-features = false }
+log = "0.4.26"
+serde = "1.0.219"
 simple_logger = { version = "5.0.0", default-features = false }
-time = { version = "0.3.36", features = ["formatting"] } # must match dependency in cookie
-tokio = { version = "1.38.0", features = ["macros"] }
+time = { version = "0.3.40", features = ["formatting"] } # must match dependency in cookie
+tokio = { version = "1.44.1", features = ["macros"] }
 
 [dev-dependencies]
 base64 = "0.22.1"
-serde_json = "1.0.120"
-tempfile = "3.10.1"
+serde_json = "1.0.140"
+tempfile = "3.19.0"
 
 [features]
 systemd_socket_activation = ["libsystemd", "futures"]
@@ -29,7 +29,7 @@ systemd_socket_activation = ["libsystemd", "futures"]
 nix = { version = "0.29", features = ["fs", "user"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-futures = { version = "0.3.30", optional = true }
+futures = { version = "0.3.31", optional = true }
 libsystemd = { version = "0.7.0", optional = true }
 
 [profile.release]
