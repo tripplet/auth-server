@@ -15,7 +15,7 @@ log = "0.4.26"
 serde = "1.0.219"
 simple_logger = { version = "5.0.0", default-features = false }
 time = { version = "0.3.40", features = ["formatting"] } # must match dependency in cookie
-tokio = { version = "1.44.1", features = ["macros"] }
+tokio = { version = "1.44.2", features = ["macros"] }
 
 [dev-dependencies]
 base64 = "0.22.1"
