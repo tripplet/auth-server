@@ -71,7 +71,7 @@ async fn generate(
 pub async fn run_server(cfg: &Config) {
     let secret_key = match cfg.get_secret() {
         Err(err) => {
-            error!("{}", err);
+            error!("{err}");
             process::exit(-1);
         }
         Ok(key) => key,
@@ -132,13 +132,13 @@ pub async fn run_server(cfg: &Config) {
             }));
 
             // If a idle timeout is set, create a new timeout task and add it to the task list
-            if let Some(idle_time) = cfg.systemd_activation_idle {
-                if idle_time > 0 {
-                    tasks.push(create_idle_timeout_task(
-                        request_received.clone(),
-                        tokio::time::Duration::from_secs(u64::from(idle_time)),
-                    ));
-                }
+            if let Some(idle_time) = cfg.systemd_activation_idle
+                && idle_time > 0
+            {
+                tasks.push(create_idle_timeout_task(
+                    request_received.clone(),
+                    tokio::time::Duration::from_secs(u64::from(idle_time)),
+                ));
             }
 
             select! {
