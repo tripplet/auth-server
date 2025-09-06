@@ -1,14 +1,14 @@
+use crate::Config;
 use crate::auth;
 use crate::http;
 use crate::listen;
-use crate::Config;
 
-use std::sync::{atomic::AtomicBool, atomic::Ordering, Arc};
+use std::sync::{Arc, atomic::AtomicBool, atomic::Ordering};
 use std::{error::Error, process};
 
 use actix_web::cookie::{Cookie, SameSite};
 use actix_web::middleware::{Condition, Logger};
-use actix_web::{get, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{App, HttpRequest, HttpResponse, HttpServer, Responder, get, web};
 
 use log::error;
 use time::macros::format_description;
@@ -225,8 +225,8 @@ fn create_socket_file(
 }
 
 #[cfg(feature = "systemd_socket_activation")]
-pub fn socket_from_systemd_activation(
-) -> Result<Option<std::os::unix::net::UnixListener>, Box<dyn Error>> {
+pub fn socket_from_systemd_activation()
+-> Result<Option<std::os::unix::net::UnixListener>, Box<dyn Error>> {
     use libsystemd::activation;
     use std::os::unix::io::{FromRawFd, IntoRawFd};
     use std::os::unix::net::UnixListener;
@@ -241,6 +241,7 @@ pub fn socket_from_systemd_activation(
     }
 }
 
+/// Creates an idle timeout task that monitors activity and exits after a period of inactivity
 #[cfg(feature = "systemd_socket_activation")]
 fn create_idle_timeout_task(
     activity: Arc<AtomicBool>,

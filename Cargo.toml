@@ -1,26 +1,26 @@
 [package]
 name = "auth-server"
-version = "1.3.10"
+version = "1.3.11"
 authors = ["Tobias Tangemann <tobias@tangemann.org>"]
 description = "Service for authenticating requests from nginx (ngx_http_auth_request_module)."
 edition = "2024"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
-actix-web = { version = "4.10.2", default-features = false, features = ["macros", "cookies"] }
+actix-web = { version = "4.11", default-features = false, features = ["macros", "cookies"] }
 clap = { version = "4.5", features = ["derive", "env"] }
 cookie = "0.18.1"
-jsonwebtoken = { version = "9.3.1", default-features = false }
+jsonwebtoken = { version = "9.3", default-features = false }
 log = "0.4"
-serde = "1.0.219"
-simple_logger = { version = "5.0.0", default-features = false }
-time = { version = "0.3.41", features = ["formatting"] } # must match dependency in cookie
-tokio = { version = "1.44.2", features = ["macros"] }
+serde = "1"
+simple_logger = { version = "5", default-features = false }
+time = { version = "0.3", features = ["formatting"] } # must match dependency in cookie
+tokio = { version = "1.47", features = ["macros"] }
 
 [dev-dependencies]
-base64 = "0.22.1"
-serde_json = "1.0.140"
-tempfile = "3.19"
+base64 = "0.22"
+serde_json = "1"
+tempfile = "3.21"
 
 [features]
 systemd_socket_activation = ["libsystemd", "futures"]
@@ -29,8 +29,8 @@ systemd_socket_activation = ["libsystemd", "futures"]
 nix = { version = "0.30", features = ["fs", "user"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-futures = { version = "0.3.31", optional = true }
-libsystemd = { version = "0.7.0", optional = true }
+futures = { version = "0.3", optional = true }
+libsystemd = { version = "0.7", optional = true }
 
 [profile.release]
 #debug = true

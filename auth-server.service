@@ -16,11 +16,24 @@ DynamicUser=yes
 ProtectSystem=strict
 PrivateTmp=true
 PrivateDevices=true
+PrivateMounts=true
+ProtectHome=true
 ProtectKernelTunables=true
 ProtectControlGroups=true
 SystemCallArchitectures=native
 MemoryDenyWriteExecute=true
 NoNewPrivileges=true
+ProcSubset=pid
+ProtectClock=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectKernelLogs=true
+ProtectKernelModules=true
+ProtectProc=invisible
+RestrictNamespaces=true
+RestrictRealtime=true
+SystemCallArchitectures=native
+SystemCallFilter=~@cpu-emulation @debug @keyring @mount @obsolete @swap @clock @module
 
 [Install]
 WantedBy=multi-user.target

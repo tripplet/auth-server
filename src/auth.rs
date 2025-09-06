@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{Algorithm, DecodingKey, EncodingKey, Header, Validation, decode, encode};
 use serde::{Deserialize, Serialize};
 use time::Duration;
 
@@ -62,7 +62,7 @@ pub fn seconds_saturating(duration: u64) -> Duration {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use base64::{engine::general_purpose, Engine as _};
+    use base64::{Engine as _, engine::general_purpose};
 
     #[test]
     fn generate_token_now() {
