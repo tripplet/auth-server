@@ -10,7 +10,7 @@ license = "MIT OR Apache-2.0"
 actix-web = { version = "4.11", default-features = false, features = ["macros", "cookies"] }
 clap = { version = "4.5", features = ["derive", "env"] }
 cookie = "0.18.1"
-jsonwebtoken = { version = "9.3", default-features = false }
+jsonwebtoken = { version = "10.3", default-features = false }
 log = "0.4"
 serde = "1"
 simple_logger = { version = "5", default-features = false }
