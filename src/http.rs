@@ -89,8 +89,8 @@ pub async fn run_server(cfg: &Config) {
         App::new()
             .wrap(Condition::new(verbose, Logger::default()))
             .app_data(web::Data::new(AppState {
-                cookie_name: cookie_name.to_string(),
-                secret_key: secret_key.to_string(),
+                cookie_name: cookie_name.clone(),
+                secret_key: secret_key.clone(),
                 request_received: request_received_setter.clone(),
             }))
             .service(check)
